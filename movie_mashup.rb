@@ -4,7 +4,8 @@ require 'yaml'
 require 'net/http'
 require 'json'
 
-api_key = ARGV[0] 
+# if you don't have a movies.dat file, you'll need your own api key. Supply it as the second argument
+api_key = ARGV[1] 
 url= "https://api.themoviedb.org/3/discover/movie?api_key=#{api_key}&language=en-US&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&vote_count.gte=400"
 
 movieDb = nil
@@ -32,6 +33,7 @@ if(!File.exists?("movies.dat"))
    }
    File.open("movies.dat", "w") { |fn| fn << YAML::dump(movieDb) }
 end
+
 if(!File.exists?("movies_processed.dat"))
    movieDb = YAML::load_file("movies.dat")
    puts "processing #{movieDb.size} movies"
@@ -50,7 +52,8 @@ if(!File.exists?("movies_processed.dat"))
       # do we ant to include articles or not?
       movieTitleShort = movieTitle#.gsub(/^(A |The |An |And )/,"")
       tokens = movieTitleShort.split(/\W/)
-      if(tokens.size==0 || tokens.size==1 || movieTitleShort =~ /^[0-9:]+$/)
+      # nuke one word movies and movies which are all numbers
+      if(tokens.size==0 || tokens.size==1 || movieTitleShort =~ /^[0-9:_']+$/)
          nil
       else
          [movieTitle, movieTitleShort, tokens[0].gsub(/\W/,""), tokens[-1].gsub(/\W/,"")]
@@ -62,3 +65,24 @@ else
 end
 
 
+def findMatches(item, movieDbProc, targetDepth, matchSoFar="")
+   matches = []
+   movieDbProcMinusItem = movieDbProc.collect { |i| i unless (i[0]==item[0])}.compact
+   movieDbProcMinusItem.each { |itemNext|
+      if(item[0]!=itemNext[0] && itemNext[2]!="" && item[3]==itemNext[2])
+         newMatchSoFar = "#{matchSoFar} <=> #{itemNext[0]}"
+         puts newMatchSoFar
+         if(targetDepth <= 1)
+            matches << newMatchSoFar
+         else
+            matches << findMatches(itemNext, movieDbProcMinusItem, targetDepth-1, newMatchSoFar)
+         end
+      end
+   }
+   return matches
+end
+
+matches = []
+movieDbProc.each { |item|
+   matches << findMatches(item, movieDbProc, ARGV[0].to_i - 1, item[0])
+}
