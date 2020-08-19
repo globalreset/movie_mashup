@@ -4,9 +4,13 @@ require 'yaml'
 require 'net/http'
 require 'json'
 
-# if you don't have a movies.dat file, you'll need your own api key. Supply it as the second argument
+# ./movie_mashup.rb target_depth <api key>
+#    - target depth is a required argument
+#    - if you don't have a movies.dat file, you'll need your own api key. Supply it as the second argument
+
 api_key = ARGV[1] 
-url= "https://api.themoviedb.org/3/discover/movie?api_key=#{api_key}&language=en-US&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&vote_count.gte=400"
+url= "https://api.themoviedb.org/3/discover/movie?api_key=#{api_key}&language=en-US&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&vote_count.gte=250"
+#url="https://api.themoviedb.org/3/discover/movie?api_key=#{api_key}&language=en-US&sort_by=revenue.desc&include_adult=false&include_video=false&primary_release_date.gte=1975-01-01&primary_release_date.lte=2020-08-01&vote_count.gte=200"
 
 movieDb = nil
 movieDbProc = nil
@@ -14,20 +18,23 @@ if(!File.exists?("movies.dat"))
    movieDb = []
    response = JSON.parse(Net::HTTP.get(URI("#{url}&page=1")))
    pages = response["total_pages"].to_i
+   puts response.inspect
    puts "Getting #{pages} pages of movies"
    pages.times { |i|
-      response["results"].each { |result|
-         puts "adding #{result["original_title"]}"
-         movieDb << result["original_title"]
-      }
-      if(i+1<pages)
-         begin
-            retries ||= 0
-            puts "Reading page #{i+1}, try #{retries}"
-            system("sleep 0.1")
-            response = JSON.parse(Net::HTTP.get(URI("#{url}&page=#{i+1}")))
-         rescue
-            retry if (retries += 1) < 3
+      if(movieDb.size<5000)
+         response["results"].each { |result|
+            puts "adding #{result["title"]}"
+            movieDb << result["title"]
+         }
+         if(i+1<pages)
+            begin
+               retries ||= 0
+               puts "Reading page #{i+1}, try #{retries}"
+               system("sleep 0.1")
+               response = JSON.parse(Net::HTTP.get(URI("#{url}&page=#{i+1}")))
+            rescue
+               retry if (retries += 1) < 3
+            end
          end
       end
    }
